@@ -1,12 +1,43 @@
-# React + Vite
+Servio: Vehicle Service and Repair Management System 🚗💻
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+We are excited to share after nearly month of continus efforts my team i proudly present , Servio, a full-stack web-based platform revolutionizing automotive service management in Sri Lanka. This comprehensive system connects Vehicle owners, Service centers, Technicians, and Admins in a seamless, User-friendly ecosystem. From booking services to tracking repairs in real-time, Servio streamlines the entire vehicle maintenance process with a modern, responsive design. ✨
 
-Currently, two official plugins are available:
+Key Features:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+🖥️ Multi-User Platform: Tailored interfaces for customers, service centers, technicians, and admins
 
-## Expanding the ESLint configuration
+🛠️ Vehicle Service Management: End-to-end workflow for service requests, scheduling, and completion
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+📊 Real-Time Job Tracking: Customers get live updates and notifications on service progress
+
+👨‍🔧 Technician Assignment: Assign skilled technicians based on expertise and availability
+
+🧰 Spare Parts Inventory: Efficient tracking and ordering system for vehicle parts
+
+📴 Offline Capability: Firebase ensures functionality with seamless data sync when back online
+
+📱 Responsive Design: Built with Tailwind CSS and Framer Motion for a sleek, mobile-friendly UI
+
+
+
+🛠️ Tech Stack:
+
+🎨Frontend: React.js, Tailwind CSS, Framer Motion 
+
+🚀Backend: Node.js with Express 
+
+📦Database: Firebase Firestore for real-time data 
+
+🔒Authentication: Firebase Auth with role-based access 
+
+⚙️State Management: React Context API and hooks 
+
+🌐API: RESTful services with robust error handling and offline support 
+
+🚘This project showcases my skills in building scalable, real-world applications with intuitive UI/UX, resilient data management, and offline capabilities. 
+
+📧 Contact
+
+Created with ❤️ by Lakshan Ekanayaka Feel free to connect on www.linkedin.com/in/lakshan-ekanayaka
+
+or email me at lakshanekanayakam20@gmail.com
