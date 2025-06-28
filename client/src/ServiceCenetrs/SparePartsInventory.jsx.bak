@@ -1,0 +1,440 @@
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { 
+  PencilIcon, 
+  TrashIcon, 
+  PlusIcon,
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  CloudArrowUpIcon,
+  XMarkIcon
+} from "@heroicons/react/24/solid";
+import ServiceCenterSidebar from "../components/ServiceCenterSidebar";
+import Footer from "../components/Footer";
+import sparePartsService from "../services/spareParts.service";
+import { auth } from "../firebase";
+import seedSpareParts from "../seedSpareParts";
+
+const SparePartsInventory = () => {
+  const navigate = useNavigate();
+  const [parts, setParts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  
+  const [categories, setCategories] = useState(["All Categories", "Engine", "Brakes", "Ignition", "Suspension"]);
+  const [filterCategory, setFilterCategory] = useState("All Categories");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [newPart, setNewPart] = useState({
+    partName: "",
+    category: "",
+    quantity: 0,
+    price: 0,
+    minStockLevel: 5,
+    imageUrl: "",
+    partNumber: "",
+    manufacturer: "",
+    description: "",
+  });
+  // Fetch spare parts from Firestore
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      if (currentUser) {
+        fetchParts();
+      } else {
+        navigate("/login");
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [navigate]);
+  
+  const fetchParts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await sparePartsService.getSparePartsFromFirestore();
+      
+      if (response.success) {
+        setParts(response.data);
+        
+        // Extract unique categories from parts
+        const uniqueCategories = ["All Categories", ...new Set(response.data.map(part => part.category))];
+        setCategories(uniqueCategories);
+        
+        // Set success message if there are parts
+        if (response.data.length > 0) {
+          setSuccessMessage(`Successfully loaded ${response.data.length} spare parts`);
+          setTimeout(() => setSuccessMessage(""), 3000);
+        }
+      } else {
+        // If no data found, load default parts
+        if (response.error && response.error.includes("no data")) {
+          console.log("No spare parts found, loading defaults...");
+          const defaultResponse = await sparePartsService.loadDefaultSpareParts();
+          
+          if (defaultResponse.success) {
+            const freshResponse = await sparePartsService.getSparePartsFromFirestore();
+            if (freshResponse.success) {
+              setParts(freshResponse.data);
+              
+              // Extract unique categories from parts
+              const uniqueCategories = ["All Categories", ...new Set(freshResponse.data.map(part => part.category))];
+              setCategories(uniqueCategories);
+            }
+          }
+        } else {
+          setError(response.error);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching spare parts:", err);
+      setError("Failed to load spare parts: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const filteredParts = filterCategory === "All Categories" 
+    ? parts 
+    : parts.filter(part => part.category === filterCategory);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewPart({ ...newPart, [name]: value });
+  };
+  const handleAddOrUpdatePart = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      if (isEditing) {
+        // Update existing part
+        const response = await sparePartsService.updateSparePart(newPart.id, newPart);
+        
+        if (response.success) {
+          setParts(parts.map(part => 
+            part.id === newPart.id ? { ...newPart } : part
+          ));
+          setIsEditing(false);
+        } else {
+          setError(response.error);
+        }
+      } else {
+        // Add new part
+        const response = await sparePartsService.addSparePart(newPart);
+        
+        if (response.success) {
+          setParts([...parts, response.data]);
+        } else {
+          setError(response.error);
+        }
+      }
+      
+      // Reset form and close modal
+      setNewPart({
+        name: "",
+        category: "",
+        quantity: 0,
+        price: 0,
+        threshold: 0,
+        image: "",
+      });
+      setShowAddModal(false);
+    } catch (err) {
+      console.error("Error saving part:", err);
+      setError("Failed to save part: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditPart = (part) => {
+    setNewPart({ ...part });
+    setIsEditing(true);
+    setShowAddModal(true);
+  };
+  const handleDeletePart = async (id) => {
+    if (window.confirm("Are you sure you want to delete this part?")) {
+      setLoading(true);
+      try {
+        const response = await sparePartsService.deleteSparePart(id);
+        
+        if (response.success) {
+          setParts(parts.filter(part => part.id !== id));
+          setSuccessMessage("Part deleted successfully");
+          setTimeout(() => setSuccessMessage(""), 3000);
+        } else {
+          setError(response.error);
+        }
+      } catch (err) {
+        console.error("Error deleting part:", err);
+        setError("Failed to delete part: " + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+  
+  // Seed database with sample spare parts
+  const handleSeedDatabase = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const result = await seedSpareParts(20); // Generate 20 sample parts
+      
+      if (result.success) {
+        setSuccessMessage(result.message);
+        fetchParts(); // Refresh the parts list
+      } else {
+        setError(result.message || "Failed to seed parts database");
+      }
+    } catch (err) {
+      console.error("Error seeding database:", err);
+      setError("Error seeding database: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex flex-col min-h-screen bg-gray-900 text-white font-sans bg-cover bg-center relative"
+      style={{
+        backgroundImage: `url('https://images.unsplash.com/photo-1503376780353-7e6692767b70?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80')`,
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/40"></div>
+      <div className="flex flex-1 relative z-10">
+        <ServiceCenterSidebar activePath="/spare-parts-inventory" />
+
+        <main className="flex-1 max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+          <header className="bg-white/10 backdrop-blur-md text-white p-6 rounded-lg mb-6 flex justify-between items-center shadow-lg">          <div>
+              <h1 className="text-3xl font-extrabold font-[Poppins] tracking-tight">Spare Parts Inventory</h1>
+              <p className="text-sm mt-1 font-[Open Sans] text-gray-300">Manage your spare parts stock</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={fetchParts}
+                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                title="Refresh parts inventory"
+                disabled={loading}
+              >
+                <ArrowPathIcon className={`w-5 h-5 text-gray-300 ${loading ? 'animate-spin' : 'hover:text-white'}`} />
+              </button>
+              <Link
+                to="/service-center-home"
+                className="group flex items-center gap-2 text-red-500 hover:text-red-400 transition-all duration-200 ease-in-out"
+              >
+                <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" />
+              </Link>
+            </div>
+              <span className="font-[Open Sans]">Back to Dashboard</span>
+            </Link>
+          </header>
+
+          {/* Parts Management */}
+          <section>
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
+              <h2 className="text-2xl font-bold text-white font-[Poppins]">Parts Management</h2>              <div className="flex gap-2">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="p-2 rounded-md border bg-gray-800 text-white border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 font-[Open Sans]"
+                >
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition-all duration-200 ease-in-out flex items-center gap-1"
+                >
+                  <PlusIcon className="h-5 w-5" /> Add Part
+                </button>
+                <button
+                  onClick={handleSeedDatabase}
+                  className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition-all duration-200 ease-in-out flex items-center gap-1"
+                  title="Add sample data to inventory"
+                >
+                  <CloudArrowUpIcon className="h-5 w-5" /> Seed Demo Data
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse rounded-lg shadow-lg bg-white/10 backdrop-blur-md">
+                <thead>
+                  <tr className="bg-red-600 text-white">
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Name</th>
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Category</th>
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Quantity</th>
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Price</th>
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Image</th>
+                    <th className="border border-gray-700/50 p-3 text-left font-[Raleway]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredParts.map((part) => (
+                    <tr key={part.id} className="hover:bg-gray-700/50">
+                      <td className="border border-gray-700/50 p-3 font-[Open Sans] text-gray-300">{part.name}</td>
+                      <td className="border border-gray-700/50 p-3 font-[Open Sans] text-gray-300">{part.category}</td>
+                      <td className="border border-gray-700/50 p-3 font-[Open Sans] text-gray-300">
+                        <span className={part.quantity <= part.threshold ? "text-red-500 animate-pulse" : ""}>{part.quantity}</span>
+                      </td>
+                      <td className="border border-gray-700/50 p-3 font-[Open Sans] text-gray-300">${part.price.toFixed(2)}</td>
+                      <td className="border border-gray-700/50 p-3">
+                        <img
+                          src={part.image}
+                          alt={part.name}
+                          className="h-12 w-12 object-cover rounded-md"
+                          onError={(e) => (e.target.src = "https://via.placeholder.com/50x50?text=Image+Not+Found")}
+                        />
+                      </td>
+                      <td className="border border-gray-700/50 p-3 flex gap-2">
+                        <button
+                          onClick={() => handleEditPart(part)}
+                          className="text-red-500 hover:text-red-400 hover:scale-125 transition-all duration-200 ease-in-out"
+                          title="Edit"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePart(part.id)}
+                          className="text-red-500 hover:text-red-400 hover:scale-125 transition-all duration-200 ease-in-out"
+                          title="Delete"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${isEditing || showAddModal ? "" : "hidden"}`}>
+              <div className="p-6 rounded-lg shadow-xl w-full max-w-md bg-gray-800 text-white">
+                <h3 className="text-xl font-semibold mb-4 font-[Raleway] text-white">{isEditing ? "Edit Spare Part" : "Add New Spare Part"}</h3>
+                <form onSubmit={handleAddOrUpdatePart} className="space-y-4 font-[Open Sans]">
+                  <div>
+                    <label className="block mb-1 text-gray-300">Part Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={newPart.name}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., Oil Filter"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-gray-300">Category</label>
+                    <input
+                      type="text"
+                      name="category"
+                      value={newPart.category}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., Engine"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-gray-300">Quantity</label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={newPart.quantity}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., 50"
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-gray-300">Price ($)</label>
+                    <input
+                      type="number"
+                      name="price"
+                      value={newPart.price}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., 15.99"
+                      step="0.01"
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-gray-300">Threshold</label>
+                    <input
+                      type="number"
+                      name="threshold"
+                      value={newPart.threshold}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., 20"
+                      min="0"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block mb-1 text-gray-300">Image URL (optional)</label>
+                    <input
+                      type="text"
+                      name="image"
+                      value={newPart.image}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="e.g., https://example.com/image.jpg"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddModal(false);
+                        setIsEditing(false);
+                        setNewPart({
+                          name: "",
+                          category: "",
+                          quantity: 0,
+                          price: 0,
+                          threshold: 0,
+                          image: "",
+                        });
+                      }}
+                      className="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-500 hover:scale-105 transition-all duration-200 ease-in-out transform"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 hover:scale-105 transition-all duration-200 ease-in-out transform"
+                    >
+                      {isEditing ? "Update" : "Save"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+        </main>
+      </div>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default SparePartsInventory;
